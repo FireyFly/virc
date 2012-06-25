@@ -2,13 +2,6 @@ local ircsock = require './ircsock'
 local util    = require './util'
 
 
--- Configuration -- TODO: Move this out of here...
-local config = { nick      = "virc-test"
-               , ident     = "virc"
-               , real_name = "Testing testing"
-               }
-
-
 ---- simple EventEmitter à la Node ----------------------------------
 local Conn = { proto = {}, mt = {} }
 Conn.mt.__index = Conn.proto
@@ -36,8 +29,17 @@ function Conn.proto.emit(self, event, ...)
 end
 
 
-local function createConnection(host, port)
+local function createConnection(config)
+  assert(config,           "no config supplied")
+  assert(config.hostname,  "must supply hostname")
+  assert(config.nick,      "must supply nick")
+  assert(config.ident,     "must supply ident")
+  assert(config.real_name, "must supply real name")
+
+  config.port = config.port or 6667
+
   local self = { _listeners = {}
+               , config     = config
                , users      = {}
                , channels   = {}
                }
@@ -48,7 +50,7 @@ local function createConnection(host, port)
 
   setmetatable(self, Conn.mt)
 
-  self.sock = ircsock.open(host, port)
+  self.sock = ircsock.open(config.hostname, config.port)
   init_conn(self)
 
   return self
@@ -165,6 +167,21 @@ local function user_renick(conn, oldnick, newnick)
   end
 end
 
+local function user_quit(conn, nick)
+  local entry = conn.users[nick]
+
+  -- no entry found--silently ignore user_quit
+  if entry == nil then return end
+
+  -- remove this user from all channels she's in
+  for chan in pairs(entry.channels) do
+    conn.channels[chan].users[nick] = nil
+  end
+
+  -- remove the user-ref itself
+  conn.users[nick] = nil
+end
+
 
 ---- Handlers & init_conn -------------------------------------------
 function init_conn(self)
@@ -259,7 +276,7 @@ function init_conn(self)
 
  -- if target == "AUTH" then
     if not self.state.authenticated then
-      local u = config
+      local u = self.config
 
       if not self.state.authenticated then
         sock:send("USER", u.ident, "-", "-", u.real_name)
@@ -288,6 +305,17 @@ function init_conn(self)
         self:emit("notice", variant, target, msg.source, message)
       end
     end
+  end
+
+  sock.handlers["QUIT"] = function(msg)
+    local message = unpack(msg.params)
+
+    -- note: we emit 'quit' *before* removing the user & his refs... because
+    -- otherwise the handlers can't know which channels the user used to be in.
+    self:emit("quit", msg.source, message)
+
+    -- TODO: Handle when *I* quit...
+    user_quit(self, msg.source.nick)
   end
 
   sock.handlers["NICK"] = function(msg)   -- Nick change

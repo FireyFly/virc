@@ -9,10 +9,19 @@ local tree       = require './vim-tree'
 local util       = require './util'
 
 
+-- Configuration
+local config = { nick      = "virc-test"
+               , ident     = "virc"
+               , real_name = "Testing testing"
+
+               -- the server to connect to
+               , hostname  = "localhost"
+               , port      = 6667
+               }
+
+
 -- the connection
-local conn = connection.open(   "localhost"
-                              --"chat.freenode.net"
-                               , 6667)
+local conn = connection.open(config)
 
 ---- Vim interfacing ------------------------------------------------
 -- This part sets up the interface and associates various Vim events
@@ -252,6 +261,12 @@ conn:on("nick", function(oldnick, newnick)
   end
 end)
 
+conn:on("quit", function(user, message)
+  for chan in pairs(conn.users[user.nick].channels) do
+    print_to(chan, ("* %s has quit IRC (%s)"):format(user.nick, message))
+  end
+end)
+
 conn:on("message", function(target, source, msg)
   print_to(target, ("<%s> %s"):format(tostring(source), msg))
 end)
@@ -288,8 +303,17 @@ conn:on("ctcp", function(target, source, cmd, args)
   local s = cmd
   if #args > 0 then s = s .. " " .. args end
 
+  -- first, check for CTCP action--we don't want the user to see this as a form
+  -- of CTCP, really.
+  if cmd == "ACTION" then
+    print_to(target, ("* %s %s"):format(tostring(source), args))
+    return
+  end
+
+  -- notify the user about the CTCP message
   c.warn(("* CTCP [from %s] %s"):format(tostring(source), s))
 
+  -- act according to the CTCP command
   if cmd == "VERSION" then
     conn:ctcp_reply(target, "VERSION", "virc 0")
 

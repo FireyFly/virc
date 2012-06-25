@@ -1,10 +1,12 @@
- [ ] Improve the way the timer works?
- [ ] Refresh channel buffer even when channel-window doesn't have focus
- [ ] Track topic of channels
- [ ] Add support for colours and formatting
+ o Improve the way the timer works?
+ o Refresh channel buffer even when channel-window doesn't have focus
+ o Track topic of channels
+ o Add support for colours and formatting
 
- [ ] Add new keybindings to input-field (history management, nick tab completion)
- [ ] Add new keybindings in general (next-channel, prev-channel)
- [ ] Add new keybindings to tab tree (join channel, part channel, ...)
+ o Add new keybindings to input-field (history management, nick tab completion)
+ o Add new keybindings in general (next-channel, prev-channel)
+ o Add new keybindings to tab tree (join channel, part channel, ...)
 
- [ ] Add support for ERC-like input (input line in channel buffer)?
+ o Add support for ERC-like input (input line in channel buffer)?
+
+ o Make configuration easier
