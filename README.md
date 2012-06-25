@@ -10,10 +10,15 @@ show `+lua`).
 
 Settings (nickname, realname etc) are hard-coded for now.
 
+    $ cd /path/to/virc/src
     $ vim +'set rtp+=.' +'luafile main.lua'
 
 
+## Screenshot
+![virc screenshot](https://github.com/FireyFly/virc/raw/master/res/screenshot.png)
+
+
 ## Questions?
-virc is developed by members of the ΩF:∅ foundation.  Ask in #oftn at FreeNode
-for support or if you have any questions about the project.
+virc is developed by members of The ΩF:∅ Foundation.  Ask in #oftn on Freenode
+(irc.freenode.net) for support or if you have any questions about the project.
 
