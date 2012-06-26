@@ -10,30 +10,6 @@ endif
 
 
 """" Syntactic entries """"""""""""""""""""""""""""""""""""""""""""""
-" Log messages are special messages indicating beginnig/end of logging
-"syn match    irclogLogMessage      "^\*\*\*\*.*"
-
-" Stamped messages are all messages that begins with timestamp
-"syn region   irclogStampedLine      matchgroup=irclogTimestamp
-"\                                   start="^\w\{3} \d\{2} [:0-9]\+"  end="$"
-"\            keepend  contains=irclogSysMessage,irclogTextMessage
-
-" Sys messages are stamped messages with meta-information (joins, quits, ...)
-"syn match    irclogSysMessage       " \*\t.*"  contained
-"\                                   contains=@irclogSysMessages
-
-"syn region   irclogJoinQuitMessage  matchgroup=irclogNick  start="\t\S\+"
-"\                                   matchgroup=NONE        end="has \w\+"
-"\                                   contained  oneline  transparent
-
-"syn cluster  irclogSysMessages      contains=irclogJoinQuitMessage
-
-" Regular message lines
-"syn match    irclogTextMessage      " <\S\+>.*" contained
-"\                                   contains=irclogNick
-"syn region   irclogNick             matchgroup=Delimiter start="<" end=">"
-"\                                   contained
-
 syn region   vircChannelStampedLine matchgroup=vircChannelTimestamp
 \                                   start="\[[:0-9]\+\]"  end="$"
 \            keepend  contains=@vircChannelLine
@@ -45,12 +21,45 @@ syn match    vircChannelBareNick    "\S\+" contained nextgroup=vircChannelSysNot
 
 syn match    vircChannelChannel     "#\S\+"
 
-syn match    vircChannelMessage     " <\S\+>.*" contained contains=vircChannelNick
+syn match    vircChannelMessage     " <\S\+>.*" contained contains=vircChannelNick,@vircFormatting
 syn match    vircChannelSysNote     " \* "      contained nextgroup=vircChannelBareNick
 syn match    vircChannelSysNoteTail ".\+"       contained
 
 syn cluster  vircChannelLine        contains=vircChannelMessage,vircChannelSysNote
 
+
+"" Formatting
+for i in range(1, 9)
+  " Add fg
+  exec "syn match vircFormatting_fg" . i . " '\\(0" . i . "\\|" . i
+\    . "\\D\\@=\\)[^]*'"
+\    . " contains=vircControlChar nextgroup=vircControlChar"
+
+  " Add bg
+  exec "syn match vircFormatting_bg" . i . " '\\d\\d\\?,\\(0" . i
+\    . "\\|" . i . "\\D\\@=\\)[^]*'"
+\    . " contains=@vircFormatting_2,vircControlChar nextgroup=vircControlChar"
+
+  " Register in the formatting cluster
+  exec "syn cluster  vircFormatting_2 add=vircFormatting_fg" . i
+  exec "syn cluster  vircFormatting add=vircFormatting_fg" . i
+\                                   . ",vircFormatting_bg" . i
+endfor
+for i in range(10, 16)
+  "syn match vircFormatting_fg10 "10[^]*"
+  exec "syn match vircFormatting_fg" . i . " '" . i "[^]*'"
+  exec "syn cluster  vircFormatting2 add=vircFormatting_fg" . i
+
+  exec "syn match vircFormatting_bg" . i . " '\\d\\d\\?," . i "[^]*'"
+  exec "syn cluster  vircFormatting add=vircFormatting_bg" . i
+endfor
+
+syn match vircControlChar "\d\{0,2}\(,\d\{0,2}\)\?\|"  contained conceal
+"syn cluster vircFormatting add=vircControlChar
+
+"syn cluster  vircFormatting
+"\ contains=vircFormatting_fg1,vircFormatting_fg2,vircFormatting_fg3
+"\ add=vircFormatting_fg4,vircFormatting_fg5
 
 
 """" Highlighting """""""""""""""""""""""""""""""""""""""""""""""""""
@@ -61,6 +70,30 @@ hi def link  vircChannelNick           Type
 hi def link  vircChannelBareNick       vircChannelNick
 hi def link  vircChannelTimestamp      Identifier
 hi def link  vircChannelChannel        Special
+
+hi vircFormatting_fg1  ctermfg=0
+hi vircFormatting_fg2  ctermfg=4
+hi vircFormatting_fg3  ctermfg=2
+hi vircFormatting_fg4  ctermfg=9
+hi vircFormatting_fg5  ctermfg=1
+hi vircFormatting_fg6  ctermfg=5
+
+hi vircFormatting_fg14 ctermfg=8
+hi vircFormatting_fg16 ctermfg=7
+
+
+hi vircFormatting_bg1  ctermbg=0
+hi vircFormatting_bg2  ctermbg=4
+hi vircFormatting_bg3  ctermbg=2
+hi vircFormatting_bg4  ctermbg=9
+hi vircFormatting_bg5  ctermbg=1
+hi vircFormatting_bg6  ctermbg=5
+
+hi vircFormatting_bg14 ctermbg=8
+hi vircFormatting_bg16 ctermbg=7
+"for i in range(1,16)
+"  exec "hi vircFormatting_fg" . i . " ctermfg=" . i
+"endfor
 
 
 let b:current_syntax = "virc-channel"

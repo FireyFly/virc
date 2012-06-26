@@ -3,6 +3,7 @@ package.loaded['./connection'] = nil
 package.loaded['./ircsock']    = nil
 package.loaded['./vim-tree']   = nil
 package.loaded['./util']       = nil
+package.loaded['./commands']   = nil
 
 local connection = require './connection'
 local tree       = require './vim-tree'
@@ -56,8 +57,8 @@ local function setupView()
 
   ---- prepare windows ----
   -- the main (channel) window
---vim.command("botright vnew")
-  vim.command("enew")
+  vim.command("botright vnew")
+--vim.command("enew")
   local chan_win = vim.window()
 
   -- the channel tree window
@@ -94,6 +95,7 @@ local function setupView()
       enew
       setlocal bt=nofile bh=hide nonu ft=virc-channel
       setlocal stl=%%<%s\ %%=[%%n]\ 
+      setlocal cole=2 cocu=nvic
     ]=]):format(label:gsub(" ", "\\ ")))
     setup_shared()
 
@@ -350,7 +352,7 @@ conn:on("topic", function(chan, user, topic)
 end)
 
 conn:on("connected", function()
-  c.warn(" * Connected successfully!")
+  c.warn("* Connected successfully!")
   conn:join("#test")
 end)
 
@@ -364,48 +366,26 @@ end)
 
 
 ---- Slash commands -------------------------------------------------
-local commands = {}
-commands["join"] = function(chan)
-  conn:join(chan)
-end
-commands["j"] = commands["join"]
+commands = {} -- global, so that other modules can write directly to it.
 
-commands["part"] = function(chan)
-  chan = chan or view.active.name
-  conn:part(chan)
-end
+commands["reload"] = function(conn, module_name)
+  local module = package.loaded[module_name]
 
-commands["hop"] = function(chan)
-  chan = chan or view.active.name
-  conn:part(chan)
-  conn:join(chan)
-end
+  if module == nil then
+    error(("no module '%s' loaded"):format(tostring(module_name)))
+  end
 
-commands["msg"] = function(target, ...)
-  local message = table.concat(arg, " ")
-  conn:message(target, message)
+  package.loaded[module_name] = nil
+  local new_module = require(module_name)
+
+  -- clear the old module object, then copy props over from the new one
+  for k   in pairs(module)     do module[k] = nil end
+  for k,v in pairs(new_module) do module[k] = v   end
+
+  print_to('*active', ("- Reloaded module '%s' successfully"):format(module_name))
 end
 
-commands["notice"] = function(target, ...)
-  local message = table.concat(arg, " ")
-  conn:notice(target, message)
-end
-
-commands["ctcp"] = function(target, ...)
-  conn:ctcp(target, unpack(arg))
-end
-
-commands["ping"] = function(target)
-  conn:ctcp(target, "PING", tostring(os.time()))
-end
-
-commands["version"] = function(target)
-  conn:ctcp(target, "VERSION")
-end
-
-commands["nick"] = function(newnick)
-  conn:nick(newnick)
-end
+require './commands'
 
 
 ---- Global functions -----------------------------------------------
@@ -445,7 +425,7 @@ function irc_input_sendline()
     end
 
     -- call the command!
-    local success, err = pcall(fun, unpack(args))
+    local success, err = pcall(fun, conn, unpack(args))
     if not success then
       c.error(("(%s): %s"):format(cmd, err))
     end
