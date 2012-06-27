@@ -384,19 +384,64 @@ function init_conn(self)
 
   sock.handlers["331"] = function(msg)    -- No topic set
     local _, chan, message = unpack(msg.params)
+
+    self.channels[chan].topic = nil
+
+    self:emit("topic", chan, nil)
     -- TODO
   --self:emit("topic", chan, nil, message)
   end
 
   sock.handlers["332"] = function(msg)    -- Topic set
     local _, chan, topic = unpack(msg.params)
-    -- TODO
-  --self:emit("topic", chan, topic, topic)
+
+    -- make sure that a topic object exists, and add the topic content
+    local chan_t = self.channels[chan]
+    if not chan_t.topic then chan_t.topic = {} end
+
+    chan_t.topic.content = topic
+    chan_t.topic.initial = true   -- means that the topic was set when we
+                                  -- joined the channel
+
+    -- emit a topic change if we know who set the topic (means we've received
+    -- #333 already)
+    if chan_t.topic.user then
+      self:emit("topic", chan, chan_t.topic)
+    end
+  end
+
+  sock.handlers["333"] = function(msg)    -- Topic setter & date
+    local _, chan, setter, set_time = unpack(msg.params)
+
+    -- make sure that a topic object exists, and add the metadata
+    local chan_t = self.channels[chan]
+    if not chan_t.topic then chan_t.topic = {} end
+
+    chan_t.topic.user    = setter
+    chan_t.topic.date    = tonumber(set_time)
+    chan_t.topic.initial = true   -- see #333 above
+
+    -- emit a topic change if we know who set the topic (means we've received
+    -- #332 already)
+    if chan_t.topic.content then
+      self:emit("topic", chan, chan_t.topic)
+    end
   end
 
   sock.handlers["TOPIC"] = function(msg)  -- Topic changed
-    local _, chan, topic = unpack(msg.params)
-    self:emit("topic", chan, msg.source, topic)
+    local chan, topic = unpack(msg.params)
+
+    local chan_t = self.channels[chan]
+
+    if not self.channels[chan] then chan_add(self, chan) end
+    chan_t.topic = { content = topic
+                   , user    = msg.source
+                   , date    = os.time()
+                   , initial = false  -- see #332 above
+                   }
+
+    -- emit the topic change
+    self:emit("topic", chan, chan_t.topic)
   end
 end
 

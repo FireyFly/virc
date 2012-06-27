@@ -32,6 +32,12 @@ commands["ctcp"] = function(conn, target, ...)
   conn:ctcp(target, unpack(arg))
 end
 
+commands["me"] = function(conn, ...)
+  local message = table.concat(arg, " ")
+  local target  = view.active.name
+  conn:ctcp(target, "ACTION", message)
+end
+
 commands["ping"] = function(conn, target)
   conn:ctcp(target, "PING", tostring(os.time()))
 end
