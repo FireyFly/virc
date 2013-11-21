@@ -17,8 +17,3 @@ Settings (nickname, realname etc) are hard-coded for now.
 ## Screenshot
 ![virc screenshot](https://github.com/FireyFly/virc/raw/master/res/screenshot.png)
 
-
-## Questions?
-virc is developed by members of The ΩF:∅ Foundation.  Ask in #oftn on Freenode
-(irc.freenode.net) for support or if you have any questions about the project.
-

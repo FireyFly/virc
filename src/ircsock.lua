@@ -153,6 +153,8 @@ end
 -- Returns nil & error if an error occured, or the string as it is sent to
 -- the server if nothing unexpected happened.
 function IRCSock.proto.send(self, ...)
+  local arg = {...}
+
   -- make sure that nothing we're sending contains unwanted line breaks
   for _,param in ipairs(arg) do
     if param:find("\r") or param:find("\n") then

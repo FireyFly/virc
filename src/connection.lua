@@ -18,6 +18,7 @@ end
 
 -- emits an event to all listeners
 function Conn.proto.emit(self, event, ...)
+  local arg = {...}
   local l = self._listeners
 
   if l[event] then
@@ -38,15 +39,14 @@ local function createConnection(config)
 
   config.port = config.port or 6667
 
-  local self = { _listeners = {}
-               , config     = config
-               , users      = {}
-               , channels   = {}
-               }
+  local self = { _listeners = {},
+                 config     = config,
+                 users      = {},
+                 channels   = {} }
 
-  self.state = { user          = { nick = config.nick }
-               , authenticated = false
-               }
+  self.state = { user = setmetatable({ nick = config.nick },
+                                     { __tostring = function (self) return self.nick end }),
+                 authenticated = false }
 
   setmetatable(self, Conn.mt)
 
@@ -76,6 +76,7 @@ function Conn.proto.message(self, target, msg)
   assert(type(msg) == 'string', "No message provided!")
 
   self.sock:send("PRIVMSG", target, msg)
+  self:emit("message", target, self.state.user, msg)
 end
 
 function Conn.proto.notice(self, target, msg)
@@ -86,6 +87,7 @@ function Conn.proto.notice(self, target, msg)
 end
 
 function Conn.proto.ctcp(self, target, ...)
+  local arg = {...}
   assert(type(target) == 'string', "No target provided!")
   assert(type(arg[1]) == 'string', "No CTCP command provided!")
 
@@ -94,7 +96,17 @@ function Conn.proto.ctcp(self, target, ...)
   self.sock:send("PRIVMSG", target, ("\001%s\001"):format(message))
 end
 
+function Conn.proto.action(self, target, ...)
+  assert(type(target) == 'string', "No target provided!")
+
+  local message = table.concat({...}, " ")
+
+  self:ctcp(target, "ACTION", message)
+  self:emit("action", target, self.state.user, message)
+end
+
 function Conn.proto.ctcp_reply(self, target, ...)
+  local arg = {...}
   assert(type(target) == 'string', "No target provided!")
   assert(type(arg[1]) == 'string', "No CTCP command provided!")
 
@@ -129,18 +141,16 @@ end
 
 ---- User & channel management functions ----------------------------
 local function chan_add(conn, name)
-  local entry = { topic = nil
-                , users = {}
-                }
+  local entry = { topic = nil,
+                  users = {} }
 
   conn.channels[name] = entry
   return entry
 end
 
 local function user_add(conn, nick)
-  local entry = { nick     = nick
-                , channels = {}
-                }
+  local entry = { nick     = nick,
+                  channels = {} }
 
   conn.users[nick] = entry
   return entry
@@ -264,8 +274,13 @@ function init_conn(self)
       local cmd  = message:sub(2, idx - 1):upper()
       local args = message:sub(idx + 1)
 
-      self:emit("ctcp", target, msg.source, cmd, args)
+      -- special-case CTCP ACTION.
+      if cmd == "ACTION" then
+        self:emit("action", target, msg.source, argS)
 
+      else
+        self:emit("ctcp", target, msg.source, cmd, args)
+      end
     else
       self:emit("message", target, msg.source, message)
     end
@@ -358,6 +373,18 @@ function init_conn(self)
   sock.handlers["353"] = function(msg)    -- NAMES entry
     local _, kind, chan, nicks = unpack(msg.params)
 
+    local chan_visibility_map = { ["@"]="secret", ["*"]="private" }
+    local visibility_s = chan_visibility_map[kind] or "public"
+
+    local chan_t = self.channels[chan]
+
+    -- first, check if the channel visibility status is new
+    if chan_t.visibility ~= visibility_s then
+      chan_t.visibility = visibility_s
+      self:emit("chan-visibility", chan, visibility_s, kind)
+    end
+
+    -- then, collect user=>flag map and emit
     local flagMap = { ["@"]="@", ["+"]="+" }
 
     local users = {}
@@ -367,14 +394,15 @@ function init_conn(self)
       local flag = flagMap[firstChar] or " "
       local nick = (flag == " ") and entry or entry:sub(2)
 
+      -- update local status of the users
       if not self.users[nick] then user_add(self, nick) end
       self.users[nick].channels[chan] = { flag=flag }
-      self.channels[chan].users[nick] = self.users[nick]
+      chan_t.users[nick] = self.users[nick]
 
       users[nick] = flag
     end
 
-    self:emit("names", chan, kind, users)
+    self:emit("names", chan, users)
   end
 
   sock.handlers["366"] = function(msg)    -- End of NAMES

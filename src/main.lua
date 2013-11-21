@@ -1,257 +1,281 @@
--- FIXME: Temporary, to make development easier!
-package.loaded['./connection'] = nil
-package.loaded['./ircsock']    = nil
-package.loaded['./vim-tree']   = nil
-package.loaded['./util']       = nil
-package.loaded['./commands']   = nil
+  -- FIXME: Temporary, to make development easier!
+  package.loaded['./connection'] = nil
+  package.loaded['./ircsock']    = nil
+  package.loaded['./vim-tree']   = nil
+  package.loaded['./util']       = nil
+  package.loaded['./commands']   = nil
 
-local connection = require './connection'
-local tree       = require './vim-tree'
-local util       = require './util'
-
-
--- Configuration
-local config = { nick      = "FF|Test"
-               , ident     = "virc"
-               , real_name = "Testing testing"
-
-               -- the server to connect to
-               , hostname  = "chat.freenode.net"
-               , port      = 6667
-               }
+  local connection = require './connection'
+  local tree       = require './vim-tree'
+  local util       = require './util'
 
 
--- the connection
-conn = connection.open(config)
+  -- Configuration
+  local config = { nick      = "FF|Test"
+                 , ident     = "virc"
+                 , real_name = "Testing testing"
 
----- Vim interfacing ------------------------------------------------
--- This part sets up the interface and associates various Vim events
--- with Lua actions.  This is the only part with interleaved vimscripts
--- (except 'vim-tree').
+                 -- the server to connect to
+                 , hostname  = "chat.freenode.net"
+               --, hostname  = "localhost"
+                 , port      = 6667
 
--- allows for simple use of multiline strings for performing multiple commands
-local function vim_do(str) vim.command(str) end
+                 , options   = { indent_nicks = false }
+                 }
 
--- Timers for keeping IRC connections alive -- calls irc_tick() periodically
-vim_do [=[
-  function! Timer()
-    lua irc_tick()
-    call feedkeys("f\e")
-  endf
-]=]
-vim_do [=[
-  function! TimerI()
-    lua irc_tick()
-    call feedkeys("a\<BS>")
-  endf
-]=]
 
-local function setupView()
-  -- shared setup stuff that all IRC-related buffers must have (such as calling
-  -- the IRC connection timers periodically).
-  local function setup_shared()
-    vim.command("setlocal updatetime=800")
-    vim.command("autocmd CursorHold  <buffer> call Timer()")
-    vim.command("autocmd CursorHoldI <buffer> call TimerI()")
-  end
+  -- the connection
+  conn = connection.open(config)
 
-  ---- prepare windows ----
-  -- the main (channel) window
---vim.command("botright vnew")
-  vim.command("enew")
-  local chan_win = vim.window()
+  ---- Vim interfacing ------------------------------------------------
+  -- This part sets up the interface and associates various Vim events
+  -- with Lua actions.  This is the only part with interleaved vimscripts
+  -- (except 'vim-tree').
 
-  -- the channel tree window
+  -- allows for simple use of multiline strings for performing multiple commands
+  local function vim_do(str) vim.command(str) end
+
+  -- Timers for keeping IRC connections alive -- calls irc_tick() periodically
   vim_do [=[
-    20vnew
-    setlocal bt=nofile nobl nonu ft=virc-tree
-    setlocal stl=%<Channels\ %=[%3(%L%)]
-    nnoremap <buffer> <C-j> Go
-    inoremap <buffer> <CR> <Esc>:lua irc_channel_accept()<CR>dd
+    function! Timer()
+      lua irc_tick()
+      call feedkeys("f\e")
+    endf
   ]=]
-  setup_shared()
-  vim.command "au BufUnload <buffer> lua irc_close()"
-  local chantree = tree.Tree.wrap(vim.window())
-
-  chan_win()
-  -- the input window
   vim_do [=[
-    belowright silent 1new
-    setlocal bt=nofile nobl nonu ft=virc-input
-    inoremap <buffer> <CR> <Esc>:lua irc_input_accept()<CR>ddi
-    setlocal stl=%<Input\ %=[%n]\ 
+    function! TimerI()
+      lua irc_tick()
+      call feedkeys("a\<BS>")
+    endf
   ]=]
-  vim.command "au BufUnload <buffer> lua irc_close()"
-  setup_shared()
-  local input_win = vim.window()
 
-  -- Creates a new buffer in the channel window and makes it the current buffer
-  -- of that window.  Resets focus to whichever window the user had focused.
-  local function createBuffer(label)
-    -- remember the current window
-    local curr_win = vim.window()
+  local function setupView()
+    -- shared setup stuff that all IRC-related buffers must have (such as calling
+    -- the IRC connection timers periodically).
+    local function setup_shared()
+      vim.command("setlocal updatetime=800")
+      vim.command("autocmd CursorHold  <buffer> call Timer()")
+      vim.command("autocmd CursorHoldI <buffer> call TimerI()")
+    end
 
-    -- switch to the chan window and init new buffer
-    chan_win()
-    vim_do(([=[
-      enew
-      setlocal bt=nofile bh=hide nonu ft=virc-channel
-      setlocal stl=%%<%s\ %%=[%%n]\ 
-      setlocal cole=2 cocu=nvic nolist lbr wrap
-    ]=]):format(label:gsub(" ", "\\ ")))
+    ---- prepare windows ----
+    -- the main (channel) window
+  --vim.command("botright vnew")
+    vim.command("enew")
+    local chan_win = vim.window()
+
+    -- the channel tree window
+    vim_do [=[
+      20vnew
+      setlocal bt=nofile nobl nonu ft=virc-tree
+      setlocal stl=%<Channels\ %=[%3(%L%)]
+      nnoremap <buffer> <C-j> Go
+      inoremap <buffer> <CR> <Esc>:lua irc_channel_accept()<CR>dd
+    ]=]
     setup_shared()
+    vim.command "au BufUnload <buffer> lua irc_close()"
+    local chantree = tree.Tree.wrap(vim.window(), "Channel tree")
 
-    -- extract the buffer, reset window & return buffer
-    local buf = chan_win.buffer
-    curr_win()
+    chan_win()
+    -- the input window
+    vim_do [=[
+      belowright silent 1new
+      setlocal bt=nofile nobl nonu ft=virc-input
+      inoremap <buffer> <CR> <Esc>:lua irc_input_accept()<CR>ddi
+      setlocal stl=%<Input\ %=[%n]\ 
+    ]=]
+    vim.command "au BufUnload <buffer> lua irc_close()"
+    setup_shared()
+    local input_win = vim.window()
 
-    return buf
-  end
+    -- Creates a new buffer in the channel window and makes it the current buffer
+    -- of that window.  Resets focus to whichever window the user had focused.
+    local function createBuffer(label)
+      -- remember the current window
+      local curr_win = vim.window()
 
-  -- Closes all IRC-related buffers and unassociates autocommands from those
-  -- buffers..
-  local function close_ui(self)
-    -- remove associated buffers completely
-    local function delete_buf(buf)
-      if buf:isvalid() then
-        local s = tostring(buf.number)
-        vim.command("autocmd! *  <buffer=" .. s ..">")
-        vim.command("bdelete " .. s)
-        return true
+      -- switch to the chan window and init new buffer
+      chan_win()
+      vim_do(([=[
+        enew
+        setlocal bt=nofile bh=hide nonu ft=virc-channel
+        setlocal stl=%%<%s\ %%=[%%n]\ 
+        setlocal cole=2 cocu=nvic nolist lbr wrap
+      ]=]):format(label:gsub(" ", "\\ ")))
+      setup_shared()
+
+      -- extract the buffer, reset window & return buffer
+      local buf = chan_win.buffer
+      curr_win()
+
+      return buf
+    end
+
+    -- Closes all IRC-related buffers and unassociates autocommands from those
+    -- buffers..
+    local function close_ui(self)
+      -- remove associated buffers completely
+      local function delete_buf(buf)
+        if buf:isvalid() then
+          local s = tostring(buf.number)
+          vim.command("autocmd! *  <buffer=" .. s ..">")
+          vim.command("bdelete " .. s)
+          return true
+        end
+      end
+
+      delete_buf(self.tree.buf)
+      delete_buf(self.input.buf)
+
+      for _,entry in self.tree:entries() do
+        delete_buf(entry.buf)
       end
     end
 
-    delete_buf(self.tree.buf)
-    delete_buf(self.input.buf)
-
-    for _,entry in self.tree:entries() do
-      delete_buf(entry.buf)
+    local function window_to_view(win, extras)
+      local res = extras or {}
+      res.win = win
+      res.buf = win.buffer
+      return res
     end
+    return { channel = window_to_view(chan_win)
+          , input   = window_to_view(input_win)
+          , tree    = chantree
+
+          , createBuffer = createBuffer
+          , close_ui     = close_ui
+          }
   end
 
-  local function window_to_view(win, extras)
-    local res = extras or {}
-    res.win = win
-    res.buf = win.buffer
-    return res
-  end
-  return { channel = window_to_view(chan_win)
-         , input   = window_to_view(input_win)
-         , tree    = chantree
-
-         , createBuffer = createBuffer
-         , close_ui     = close_ui
-         }
-end
-
--- initialise the view
-view = setupView()
-local tree  = view.tree
-local input = view.input.win
+  -- initialise the view
+  view = setupView()
+  local tree  = view.tree
+  local input = view.input.win
 
 
-local function tree_entry_callback(self)
-  local currWin = vim.window()
+  local function tree_entry_callback(self)
+    local currWin = vim.window()
 
-  view.active = self
-  tree:update({name=self.name, status=" "})
+    view.active = self
+    tree:update({name=self.name, status=" "})
 
-  view.channel.win()
-  self.buf()
-  currWin()
-end
-
---[[
-function irc_entered_buffer()
-  tree:update({name=view.active.name, state="x"})
-end
---]]
-
-local function create_tree_entry(name, line, kind, padding)
-  local buf = view.createBuffer(line)
---vim.command(("au BufHidden <buffer=%d> lua irc_entered_buffer()"):format(buf.number))
-
-  local entry = { name     = name
-                , label    = line
-                , buf      = buf
-
-                , type     = kind
-                , padding  = padding
-
-                , status    = " "
-                , status_no = 0
-
-                , callback = tree_entry_callback
-                }
-
-  view.active = entry
-  tree:append(entry)
-end
-
-create_tree_entry("server", "Server", 'server')
-
-
--- Prints the given arguments to the specified buffer (channel name).  If the
--- given name is '*active', then the currently active buffer will be used.  An
--- optional `level` (second parameter, if it's a number) represents the
--- importance of this message (default 0. 10 is a PRIVMSG).
---   If the first actual string to print contains any '%' signs, it's taken as a
--- printf-style string and passed to string.format.  Otherwise, the parameters
--- are stringified and joined together with a space.
-function print_to(name, level, str, ...)
-  -- `level` should default to 0
-  if type(level) ~= 'number' then
-    table.insert(arg, 1, str)
-    str = level
-    level = 0
+    view.channel.win()
+    self.buf()
+    currWin()
   end
 
-  -- must supply an actual target buffer name
-  if name == nil then error("print_to: name is `nil`!", 2) end
+  --[[
+  function irc_entered_buffer()
+    tree:update({name=view.active.name, state="x"})
+  end
+  --]]
 
-  -- fetch the specified buffer
-  local buf
-  if name == "*active" then
-    buf = view.channel.win.buffer
+  local function create_tree_entry(name, line, kind, padding)
+    local buf = view.createBuffer(line)
+  --vim.command(("au BufHidden <buffer=%d> lua irc_entered_buffer()"):format(buf.number))
 
-  else
-    local entry = assert(tree:get({name=name}))
-    buf = entry.buf
+    local entry = { name     = name
+                  , label    = line
+                  , buf      = buf
+
+                  , type     = kind
+                  , padding  = padding
+
+                  , status    = " "
+                  , status_no = 0
+
+                  , callback = tree_entry_callback
+                  }
+
+    view.active = entry
+    tree:append(entry)
+
+    return entry
   end
 
-  local status_map = { " ", "·", "-", "*", "#", "!" }
+  create_tree_entry("server", "Server", 'server')
 
-  -- mark tab as modified, if appropriate
-  local win     = view.channel.win
-  local currWin = vim.window()
-  if not (buf == win.buffer and win == currWin)
-      and (buf.status_no or 0) < level then
-    tree:update({ name      = name
-                , status_no = level
-                , status    = status_map[level] or "*"
-                })
-  end
 
-  -- Check for percentages, and if so, use string.format
-  local plain
-  if str:find("%", 1, true) then
-    plain = string.format(str, unpack(arg))
+  -- Prints the given arguments to the specified buffer (channel name).  If the
+  -- given name is '*active', then the currently active buffer will be used.  An
+  -- optional `level` (second parameter, if it's a number) represents the
+  -- importance of this message (default 0. 7 is a PRIVMSG).
+  --   If the first actual string to print contains any '%' signs, it's taken as a
+  -- printf-style string and passed to string.format.  Otherwise, the parameters
+  -- are stringified and joined together with a space.
+  function print_to(name, level, str, ...)
+    local arg = {...}
 
-  else
-    -- fall back to just concatenating all the arguments
-    table.insert(arg, 1, str)
-
-    -- ...but we need to make sure that they're strings first!
-    local mapped = {}
-    for _,v in ipairs(arg) do
-      table.insert(mapped, tostring(v))
+    -- `level` should default to 0
+    if type(level) ~= 'number' then
+      table.insert(arg, 1, str)
+      str = level
+      level = 0
     end
 
-    plain = table.concat(mapped, " ")
-  end
+    -- must supply an actual target buffer name
+    if name == nil then error("print_to: name is `nil`!", 2) end
 
-  -- prepare timestamp
-  local stamp = os.date("[%H:%M:%S] ")
+    -- fetch the specified buffer
+    local buf
+    if name == "*active" then
+      buf = view.channel.win.buffer
+
+    else
+      local entry = tree:get({name=name})
+
+      -- create an entry for the target if necessary
+      if entry == nil then
+        entry = create_tree_entry(name, name, 'channel', "  ")
+      end
+
+      buf = entry.buf
+    end
+
+    local status_map = { " ", "·", "·", "-", "-", "-", "*", "*",  "#", "!" }
+
+    -- mark tab as modified, if appropriate
+    local win     = view.channel.win
+    local currWin = vim.window()
+    if not (buf == win.buffer and win == currWin)
+        and (buf.status_no or 0) < level then
+      tree:update({ name      = name
+                  , status_no = level
+                  , status    = status_map[level] or "*"
+                  })
+    end
+
+    -- Check for percentages, and if so, use string.format
+    local plain
+    if str:find("%", 1, true) then
+      success, plain = pcall(string.format, str, unpack(arg))
+
+      if not plain then error(plain, 2) end
+
+    else
+      -- fall back to just concatenating all the arguments
+      table.insert(arg, 1, str)
+
+      -- ...but we need to make sure that they're strings first!
+      local mapped = {}
+      for _,v in ipairs(arg) do
+        table.insert(mapped, tostring(v))
+      end
+
+      plain = table.concat(mapped, " ")
+    end
+
+    -- prepare timestamp
+    local stamp = os.date("[%H:%M:%S] ")
+
+    -- handle xchat-style indented nicknames
+    if config.options.indent_nicks then
+      plain = plain:gsub("^<([^%s>]+)> ", function(nick)
+                                         local n   = 14 - #nick
+                                         local pad = string.rep(" ", n)
+                                         return pad .. nick .. "│"
+                                       end)
+  end
 
   -- actually append to the buffer
   buf:insert(stamp .. plain)
@@ -266,8 +290,8 @@ function print_to(name, level, str, ...)
 end
 
 
-local c = { warn  = function(...) print_to('*active', unpack(arg)) end
-          , error = function(...) print_to('*active', "Error:", unpack(arg)) end
+local c = { warn  = function(...) print_to('*active', ...) end
+          , error = function(...) print_to('*active', "Error:", ...) end
           }
 
 
@@ -275,11 +299,11 @@ local c = { warn  = function(...) print_to('*active', unpack(arg)) end
 -- These listen to various kinds of messages from the IRC connection
 -- and presents them to the user by updating the UI.
 conn:on("server-msg", function(msg)
-  print_to("server", "%s", msg)
+  print_to("server", 1, "%s", msg)
 end)
 
 conn:on("unimplemented", function(msg)
-  print_to("server", "-- [no handler]: %s", tostring(msg))
+  print_to("server", 3, "-- [no handler]: %s", tostring(msg))
 end)
 
 conn:on("self-join", function(chan)
@@ -290,42 +314,43 @@ conn:on("self-join", function(chan)
 end)
 
 conn:on("join", function(user, chan)
-  print_to(chan, "* %s has joined %s", tostring(user), chan)
+  print_to(chan, 4, "* %s has joined %s", tostring(user), chan)
 end)
 
 conn:on("part", function(user, chan)
-  print_to(chan, "* %s has left %s", tostring(user), chan)
+  print_to(chan, 4, "* %s has left %s", tostring(user), chan)
 end)
 
 conn:on("nick", function(oldnick, newnick)
   for chan in pairs(conn.users[newnick].channels) do
-    print_to(chan, "* %s is now known as %s", oldnick, newnick)
+    print_to(chan, 5, "* %s is now known as %s", oldnick, newnick)
   end
 end)
 
 conn:on("quit", function(user, message)
   for chan in pairs(conn.users[user.nick].channels) do
-    print_to(chan, "* %s has quit IRC (%s)", user.nick, message)
+    print_to(chan, 4, "* %s has quit IRC (%s)", user.nick, message)
   end
 end)
 
 conn:on("message", function(target, source, msg)
-  print_to(target, "<%s> %s", tostring(source), msg)
+  print_to(target, 7, "<%s> %s", tostring(source), msg)
 end)
 
 conn:on("notice", function(variant, target, source, msg)
   local target_s = (variant == "channel") and " [to " .. target .. "]" or ""
 
-  print_to("*active", "-%s%s- %s", tostring(source), target_s, msg)
+  print_to("*active", 8, "-%s%s- %s", tostring(source), target_s, msg)
 end)
 
-local chan_type_map = { ["@"]="secret", ["*"]="private" }
-conn:on("names", function(chan, kind, users)
-  local chanType = chan_type_map[kind]
-  if chanType then
-    print_to(chan, "* Channel %s is %s.", chan, chanType)
+conn:on("chan-visibility", function(chan, visibility)
+  if visibility ~= "public" then
+    print_to(chan, 4, "* Note: %s is a %s channel.", chan, visibility)
   end
+end)
 
+--local chan_type_map = { ["@"]="secret", ["*"]="private" }
+conn:on("names", function(chan, users)
   local lines = {}
   local names = {}
 
@@ -343,27 +368,24 @@ conn:on("names", function(chan, kind, users)
   table.insert(lines, table.concat(names, ""))
 
   for _,line in ipairs(lines) do
-    print_to(chan, "* Names: %s", line)
+    print_to(chan, 2, "* Names: %s", line)
   end
 end)
 
 conn:on("names-end", function(chan, msg)
-  print_to(chan, "* Names:", msg)
+  print_to(chan, 2, "* Names:", msg)
+end)
+
+conn:on("action", function(target, source, message)
+  print_to(target, 5, "* %s %s", tostring(source), message)
 end)
 
 conn:on("ctcp", function(target, source, cmd, args)
   local s = cmd
   if #args > 0 then s = s .. " " .. args end
 
-  -- first, check for CTCP action--we don't want the user to see this as a form
-  -- of CTCP, really.
-  if cmd == "ACTION" then
-    print_to(target, "* %s %s", tostring(source), args)
-    return
-  end
-
   -- notify the user about the CTCP message
-  c.warn("* CTCP [from %s] %s", tostring(source), s)
+  print_to("*active", 5, "* CTCP [from %s] %s", tostring(source), s)
 
   -- act according to the CTCP command
   if cmd == "VERSION" then
@@ -373,7 +395,7 @@ conn:on("ctcp", function(target, source, cmd, args)
     conn:ctcp_reply(target, "PING", args)
 
   else
-    c.warn("* Unknown CTCP request!")
+    print_to("*active", 5, "Unknown CTCP request!")
   end
 end)
 
@@ -382,10 +404,11 @@ conn:on("ctcp-reply", function(target, source, cmd, args)
     local val = tonumber(args)
     local delta = os.difftime(os.time(), val)
 
-    c.warn(("* Ping reply from %s: %d seconds."):format(tostring(source), delta))
-
+    print_to("*active", 5, "Ping reply from %s: %d seconds.",
+             tostring(source), delta)
   else
-    c.warn(("* CTCP-reply [from %s] %s %s"):format(tostring(source), cmd, args))
+    print_to("*active", 5, "* CTCP-reply [from %s] %s %s",
+             tostring(source), cmd, args)
   end
 end)
 
@@ -394,15 +417,15 @@ conn:on("topic", function(chan, topic)
   if topic.initial then
     if topic.content then
       local datestamp = os.date("%c", topic.date)
-      print_to(chan, "* Topic for %s is: %s", chan, topic.content)
-      print_to(chan, "* Topic set by %s (%s)", topic.user, datestamp)
+      print_to(chan, 3, "* Topic for %s is: %s", chan, topic.content)
+      print_to(chan, 3, "* Topic set by %s (%s)", topic.user, datestamp)
 
     else
-      print_to(chan, "* No topic set for %s.", chan)
+      print_to(chan, 3, "* No topic set for %s.", chan)
     end
 
   else
-    print_to(chan, "* %s changed topic to: %s", tostring(topic.user), topic.content)
+    print_to(chan, 3, "* %s changed topic to: %s", tostring(topic.user), topic.content)
   end
 
   -- TODO: update the statusline of the corresponding buffer
@@ -410,7 +433,7 @@ end)
 
 conn:on("connected", function()
   c.warn("* Connected successfully!")
-  conn:join("#test")
+  conn:join("#helloaoeu")
 end)
 
 conn:on("debug", function(...)
@@ -418,7 +441,7 @@ conn:on("debug", function(...)
     create_tree_entry("debug", "Debug", 'debug')
   end
 
-  print_to("debug", unpack(arg))
+  print_to("debug", 7, unpack(arg))
 end)
 
 
@@ -439,7 +462,7 @@ commands["reload"] = function(conn, module_name)
 --for k   in pairs(module)     do module[k] = nil end
 --for k,v in pairs(new_module) do module[k] = v   end
 
-  print_to('*active', "- Reloaded module '%s' successfully", module_name)
+  print_to('*active', 6, "- Reloaded module '%s' successfully", module_name)
 end
 
 require './commands'
@@ -500,12 +523,12 @@ function irc_input_accept()
     if view.active.type == 'channel' or view.active.type == 'query' then
       local target = view.active.name
       conn:message(target, line)
-      print_to(target, "<%s> %s", conn.state.user.nick, line)
+    --print_to(target, 0, "<%s> %s", conn.state.user.nick, line)
 
     elseif view.active.type == 'server' then
       conn:sendraw(line)
 
-      print_to('*active', ">> %s", line)
+      print_to('*active', 0, ">> %s", line)
 
     else
       c.error(("unknown message recipient type: %s"):format(

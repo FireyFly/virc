@@ -10,20 +10,28 @@ endif
 
 
 """" Syntactic entries """"""""""""""""""""""""""""""""""""""""""""""
-syn region   vircChannelStampedLine matchgroup=vircChannelTimestamp
-\                                   start="\[[:0-9]\+\]"  end="$"
-\            keepend  contains=@vircChannelLine
+syn match    vircChannelTimestamp   "^\[[:0-9]\+\]"
+\            nextgroup=vircChannelMessage,vircChannelSysNote
+"syn region   vircChannelStamped     matchgroup=vircChannelTimestamp
+"\                                   start="\[[:0-9]\+\]"  end="$"
+"\            keepend  contains=@vircChannelLine
 
-syn region   vircChannelNick        matchgroup=Delimiter start="<" end=">"
-\                                   contained
+"syn region   vircChannelNick        matchgroup=Delimiter start="<" end=">"
+"\                                   contained
 
-syn match    vircChannelBareNick    "\S\+" contained nextgroup=vircChannelSysNoteTail
-
+syn match    vircChannelNick        "\s*[^<>│ \t]\+" contained
 syn match    vircChannelChannel     "#\S\+"
 
-syn match    vircChannelMessage     " <\S\+>.*" contained contains=vircChannelNick,@vircFormatting
-syn match    vircChannelSysNote     " \* "      contained nextgroup=vircChannelBareNick
-syn match    vircChannelSysNoteTail ".\+"       contained
+syn match    vircChannelSep         "\>│\<"     contained
+
+syn match    vircChannelMessage     " <\S\+> "  contained
+\            contains=vircChannelNick nextgroup=vircChannelMessageBody
+syn match    vircChannelMessage     " \+\S\+│"   contained
+\            contains=vircChannelNick,vircChannelSep nextgroup=vircChannelMessageBody
+syn match    vircChannelMessageBody ".*"        contained contains=@vircFormatting
+
+syn match    vircChannelSysNote     " \* "      contained nextgroup=vircChannelNick
+"syn match    vircChannelSysNoteTail ".\+"       contained
 
 syn cluster  vircChannelLine        contains=vircChannelMessage,vircChannelSysNote
 
@@ -65,9 +73,8 @@ syn match vircControlChar "\d\{0,2}\(,\d\{0,2}\)\?\|"  contained conceal
 """" Highlighting """""""""""""""""""""""""""""""""""""""""""""""""""
 hi def link  vircChannelMessage        Normal
 hi def link  vircChannelSysNote        Comment
-hi def link  vircChannelSysNoteTail    vircChannelSysNote
+hi def link  vircChannelSep            Comment
 hi def link  vircChannelNick           Type
-hi def link  vircChannelBareNick       vircChannelNick
 hi def link  vircChannelTimestamp      Identifier
 hi def link  vircChannelChannel        Special
 

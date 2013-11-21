@@ -19,23 +19,23 @@ commands["hop"] = function(conn, chan)
 end
 
 commands["msg"] = function(conn, target, ...)
-  local message = table.concat(arg, " ")
+  local message = table.concat({...}, " ")
   conn:message(target, message)
 end
 
 commands["notice"] = function(conn, target, ...)
-  local message = table.concat(arg, " ")
+  local message = table.concat({...}, " ")
   conn:notice(target, message)
 end
 
 commands["ctcp"] = function(conn, target, ...)
-  conn:ctcp(target, unpack(arg))
+  conn:ctcp(target, ...)
 end
 
 commands["me"] = function(conn, ...)
-  local message = table.concat(arg, " ")
+  local message = table.concat({...}, " ")
   local target  = view.active.name
-  conn:ctcp(target, "ACTION", message)
+  conn:action(target, message)
 end
 
 commands["ping"] = function(conn, target)
